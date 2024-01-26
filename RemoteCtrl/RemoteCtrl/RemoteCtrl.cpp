@@ -38,15 +38,71 @@ void Dump(BYTE* pData, size_t nSize)
 
 std::string MakeDriverInfo() {//1==>A 2==>B 3==>C ... 26==>Z
 	std::string result;
-	for (int i = 1; i <= 26; i++){
+	for (int i = 1; i <= 26; i++) {
 		if (_chdrive(i) == 0) {
-			if(result.size()>0) result += ',';
+			if (result.size() > 0) result += ',';
 			result += 'A' + i - 1;
 		}
 	}
 	CPacket pack(1, (BYTE*)result.c_str(), result.size());
 	Dump((BYTE*)pack.Data(), pack.Size());
 	//CServerSocket::getInstance()->Send(pack);
+	return 0;
+}
+
+#include<stdio.h>
+#include<io.h>
+#include<list>
+typedef struct file_info{
+	file_info() {
+		IsInvalid = 0;
+		IsDirectory = -1;
+		HasNext = TRUE;
+		memset(szFileName, 0, sizeof(szFileName));
+	}
+	BOOL IsInvalid;//是否有效
+	BOOL IsDirectory;//是否为目录0否1是
+	BOOL HasNext;//是否还有后续0没有1有
+	char szFileName[256];//文件名
+}FILEINFO,*PFILEINFO;
+int MakeDirectoryInfo() {
+	std::string strPath;
+	//std::list<FILEINFO>listFileInfos;
+	if (CServerSocket::getInstance()->GetFilePath(strPath) == false) {
+		OutputDebugString(_T("当前的命令，不是获取文件列表，命令解析错误！"));
+		return -1;
+	}
+	if (_chdir(strPath.c_str()) != 0) {
+		FILEINFO finfo;
+		finfo.IsInvalid = TRUE;
+		finfo.IsDirectory = TRUE;
+		finfo.HasNext = FALSE;
+		memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
+		//listFileInfos.push_back(finfo);
+		CPacket pack(2, (BYTE*)&finfo,sizeof(finfo));
+		CServerSocket::getInstance()->Send(pack);
+		OutputDebugString(_T("没有权限访问目录！"));
+		return -2;
+	}
+	_finddata_t fdata;
+	int hfind = 0;
+	if ((hfind = _findfirst("*", &fdata)) == -1) {
+		OutputDebugString(_T("没有找到任何文件！"));
+		return -3;
+	}
+	do {
+		FILEINFO finfo;
+		finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
+		memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
+		//listFileInfos.push_back(finfo);
+		CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+		CServerSocket::getInstance()->Send(pack);
+	} while (!_findnext(hfind, &fdata));
+	//发送信息到控制端
+	FILEINFO finfo;
+	finfo.HasNext = FALSE;
+	CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+	CServerSocket::getInstance()->Send(pack);
 	return 0;
 }
 
@@ -92,6 +148,9 @@ int main()
 			switch (nCmd) {
 			case 1://查看磁盘分区
 				MakeDriverInfo();
+				break;
+			case 2://查看指定目录下的文件
+				MakeDirectoryInfo();
 				break;
 			}
 

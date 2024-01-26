@@ -85,7 +85,7 @@ public:
 		*(WORD*)pData = sCmd; pData += 2;
 		memcpy(pData, strData.c_str(), strData.size()); pData += strData.size();
 		*(WORD*)pData = sSum;
-		return 
+		return strOut.c_str();
 	}
 public:
 	WORD sHead;//固定位包头 0xFEFF
@@ -157,6 +157,13 @@ public:
 	bool Send(CPacket& pack) {
 		if (m_client == -1)return false;
 		return send(m_client, pack.Data(), pack.Size(), 0) > 0;
+	}
+	bool GetFilePath(std::string& strPath) {
+		if (m_packet.sCmd == 2) {
+			strPath = m_packet.strData;
+			return true;
+		}
+		return false;
 	}
 private:
 	SOCKET m_client;
