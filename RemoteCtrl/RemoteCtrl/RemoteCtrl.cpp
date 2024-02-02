@@ -6,6 +6,7 @@
 #include "RemoteCtrl.h"
 #include "ServerSocket.h"
 #include<direct.h>
+#include<atlimage.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -237,6 +238,38 @@ int MouseEvent()
 	return 0;
 }
 
+int SendScreen()
+{
+	CImage screen;//GDI 全局设备接口
+	HDC hScreen = ::GetDC(NULL);//获得句柄
+	int nBitPerPixel = GetDeviceCaps(hScreen, BITSPIXEL);
+	int nWidth = GetDeviceCaps(hScreen, HORZRES);
+	int nHeight = GetDeviceCaps(hScreen, VERTRES);
+	screen.Create(nWidth, nHeight, nBitPerPixel);
+	BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY);//将图像复制到screen中
+	ReleaseDC(NULL, hScreen);
+	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);//可变化内存的句柄
+	if (hMem == NULL)return -1;
+	IStream* pStream = NULL;
+	HRESULT ret=CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+	if (ret == S_OK) {
+		screen.Save(pStream, Gdiplus::ImageFormatPNG);
+		LARGE_INTEGER bg = { 0 };
+		pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+		PBYTE pData=(PBYTE)GlobalLock(hMem);
+		SIZE_T nSize = GlobalSize(hMem);
+		CPacket pack(6, pData, nSize);
+		CServerSocket::getInstance()->Send(pack);
+		GlobalUnlock(hMem);
+	}
+
+	//screen.Save(_T("test2024.png"), Gdiplus::ImageFormatPNG);
+	pStream->Release();
+	GlobalFree(hMem);
+	screen.ReleaseDC();
+	return 0;
+}
+
 int main()
 {
 	int nRetCode = 0;
@@ -275,7 +308,7 @@ int main()
 				//TODO:
 			}
 			*/
-			int nCmd = 1;
+			int nCmd = 6;
 			switch (nCmd) {
 			case 1://查看磁盘分区
 				MakeDriverInfo();
@@ -291,6 +324,9 @@ int main()
 				break;
 			case 5://鼠标操作
 				MouseEvent();
+				break;
+			case 6://发送屏幕内容==>发送屏幕的截图
+				SendScreen();
 				break;
 			}
 
