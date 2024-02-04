@@ -259,7 +259,7 @@ int SendScreen()
 		PBYTE pData=(PBYTE)GlobalLock(hMem);
 		SIZE_T nSize = GlobalSize(hMem);
 		CPacket pack(6, pData, nSize);
-		CServerSocket::getInstance()->Send(pack);
+		CServerSocket::getInstance()->Send(pack); 
 		GlobalUnlock(hMem);
 	}
 
@@ -267,6 +267,16 @@ int SendScreen()
 	pStream->Release();
 	GlobalFree(hMem);
 	screen.ReleaseDC();
+	return 0;
+}
+
+int LockMachine()
+{
+	return 0;
+}
+
+int UnlockMachine()
+{
 	return 0;
 }
 
@@ -308,7 +318,7 @@ int main()
 				//TODO:
 			}
 			*/
-			int nCmd = 6;
+			int nCmd = 7;
 			switch (nCmd) {
 			case 1://查看磁盘分区
 				MakeDriverInfo();
@@ -327,6 +337,12 @@ int main()
 				break;
 			case 6://发送屏幕内容==>发送屏幕的截图
 				SendScreen();
+				break;
+			case 7://锁机
+				LockMachine();
+				break;
+			case 8://结束
+				UnlockMachine();
 				break;
 			}
 
