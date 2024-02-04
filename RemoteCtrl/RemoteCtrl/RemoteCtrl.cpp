@@ -269,9 +269,26 @@ int SendScreen()
 	screen.ReleaseDC();
 	return 0;
 }
+#include "LockinfoDialog.h"
+CLockinfoDialog dlg;
 
 int LockMachine()
 {
+	dlg.Create(IDD_DIALOG_INFO);
+	dlg.ShowWindow(SW_SHOW);
+	dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+	MSG msg;
+	while (GetMessage(&msg, NULL, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		if (msg.message == WM_KEYDOWN) {
+			TRACE("msg:%08X wparm:%08x lparm:%08X\r\n", msg.message, msg.wParam, msg.lParam);
+			if (msg.wParam == 0x1B) {//按下ESC退出
+				break;
+			}
+		}
+	}
+	dlg.DestroyWindow();
 	return 0;
 }
 
