@@ -7,6 +7,7 @@
 #include "ServerSocket.h"
 #include<direct.h>
 #include<atlimage.h>
+#include<stdio.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -251,15 +252,15 @@ int SendScreen()
 	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);//可变化内存的句柄
 	if (hMem == NULL)return -1;
 	IStream* pStream = NULL;
-	HRESULT ret=CreateStreamOnHGlobal(hMem, TRUE, &pStream);
+	HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pStream);
 	if (ret == S_OK) {
 		screen.Save(pStream, Gdiplus::ImageFormatPNG);
 		LARGE_INTEGER bg = { 0 };
 		pStream->Seek(bg, STREAM_SEEK_SET, NULL);
-		PBYTE pData=(PBYTE)GlobalLock(hMem);
+		PBYTE pData = (PBYTE)GlobalLock(hMem);
 		SIZE_T nSize = GlobalSize(hMem);
 		CPacket pack(6, pData, nSize);
-		CServerSocket::getInstance()->Send(pack); 
+		CServerSocket::getInstance()->Send(pack);
 		GlobalUnlock(hMem);
 	}
 
@@ -271,29 +272,69 @@ int SendScreen()
 }
 #include "LockinfoDialog.h"
 CLockinfoDialog dlg;
+unsigned threadid;
 
-int LockMachine()
+unsigned __stdcall threadLockDlg(void* arg)
 {
-	dlg.Create(IDD_DIALOG_INFO);
+	TRACE("Cthreadid=%d\r\n", GetCurrentThreadId());
+	dlg.Create(IDD_DIALOG_INFO,NULL);
 	dlg.ShowWindow(SW_SHOW);
-	dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+	//遮蔽后台窗口
+	CRect rect;
+	rect.left = 0;
+	rect.top = 0;
+	rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
+	rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);
+	rect.right *= 0.2;
+	rect.bottom *= 0.2;
+	dlg.MoveWindow(rect);
+	dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);//窗口置顶
+	//限制鼠标活动范围和功能
+	ShowCursor(false);
+	//::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);//隐藏任务栏
+	//dlg.GetWindowRect(rect);
+	//限制鼠标活动范围
+	rect.left = 0;
+	rect.top = 0;
+	rect.right = 1;
+	rect.bottom = 1;
+	ClipCursor(rect);
 	MSG msg;
 	while (GetMessage(&msg, NULL, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 		if (msg.message == WM_KEYDOWN) {
 			TRACE("msg:%08X wparm:%08x lparm:%08X\r\n", msg.message, msg.wParam, msg.lParam);
-			if (msg.wParam == 0x1B) {//按下ESC退出
+			if (msg.wParam == 0x41) {//按下ESC退出
 				break;
 			}
 		}
 	}
+	ShowCursor(true);
+	//::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);//恢复任务栏
 	dlg.DestroyWindow();
+	_endthreadex(0);
+	return 0;
+}
+
+int LockMachine()
+{
+	if ((dlg.m_hWnd == NULL) || (dlg.m_hWnd == INVALID_HANDLE_VALUE)) {
+		_beginthreadex(NULL,0,threadLockDlg, NULL, 0,&threadid);
+		TRACE("threadid=%d\r\n", threadid);
+	}
+	CPacket pack(7, NULL, 0);
+	CServerSocket::getInstance()->Send(pack);
 	return 0;
 }
 
 int UnlockMachine()
 {
+	//dlg.SendMessage(WM_KEYDOWN, 0x41, 00010001);
+	//::SendMessage(dlg.m_hWnd, WM_KEYDOWN, 0x41, 00010001);
+	PostThreadMessage(threadid, WM_KEYDOWN, 0x41, 0);
+	CPacket pack(8, NULL, 0);
+	CServerSocket::getInstance()->Send(pack);
 	return 0;
 }
 
@@ -362,7 +403,12 @@ int main()
 				UnlockMachine();
 				break;
 			}
-
+			Sleep(2000);
+			UnlockMachine();
+			TRACE("m_hWnd=%08X\r\n", dlg.m_hWnd);
+			while (dlg.m_hWnd != NULL) {
+				Sleep(10);
+			}
 		}
 	}
 	else
