@@ -123,13 +123,15 @@ int DownloadFile() {
 	if (pFile != NULL) {
 		fseek(pFile, 0, SEEK_END);
 		data = _ftelli64(pFile);
-		fseek(pFile, 0, SEEK_SET);
 		CPacket head(4, (BYTE*)&data, 8);
+		CServerSocket::getInstance()->Send(head);
+		fseek(pFile, 0, SEEK_SET);
 		char buffer[1024] = "";
 		size_t rlen = 0;
 		do {
 			rlen = fread(buffer, 1, 1024, pFile);
 			CPacket pack(4, (BYTE*)&buffer, rlen);
+			CServerSocket::getInstance()->Send(pack);
 		} while (rlen >= 1024);
 		fclose(pFile);
 	}
