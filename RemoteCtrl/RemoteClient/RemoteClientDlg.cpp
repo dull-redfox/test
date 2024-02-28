@@ -222,7 +222,7 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 	}
 }
 
-void CRemoteClientDlg::LoadFIleCurrent()
+void CRemoteClientDlg::LoadFileCurrent()
 {
 	HTREEITEM hTree=m_Tree.GetSelectedItem();
 	CString strPath=GetPath(hTree);
@@ -257,6 +257,7 @@ void CRemoteClientDlg::LoadFileInfo()
 	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	CClientSocket* pClient = CClientSocket::getInstance();
+	int Count = 0;
 	while (pInfo->HasNext) {
 		TRACE("%s isdir %d\r\n", pInfo->szFileName, pInfo->IsDirectory);
 		if (pInfo->IsDirectory) {
@@ -273,13 +274,14 @@ void CRemoteClientDlg::LoadFileInfo()
 		else {
 			m_List.InsertItem(0, pInfo->szFileName);
 		}
-
+		Count++;
 		int cmd = pClient->DealCommand();
-		TRACE("ack:%d\r\n", cmd);
+		//TRACE("ack:%d\r\n", cmd);
 		if (cmd < 0)break;
 		pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	}
 	pClient->CloseSocket();
+	TRACE("Count=%d\r\n", Count);
 }
 
 CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
@@ -384,7 +386,7 @@ void CRemoteClientDlg::OnDownloadFile()
 		fclose(pFile);
 		pClient->CloseSocket();
 	}
-
+	//TOODD 大文件传输需要额外处理
 }
 
 
@@ -399,6 +401,7 @@ void CRemoteClientDlg::OnDeleteFile()
 	if (ret < 0) {
 		AfxMessageBox("删除文件命令执行失败！！！");
 	}
+	LoadFileCurrent();
 }
 
 
