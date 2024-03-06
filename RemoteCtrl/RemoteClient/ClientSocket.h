@@ -165,7 +165,7 @@ public:
 		return true;
 	}
 
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 409600
 	int DealCommand() {
 		if (m_sock == -1)return -1;
 		//char buffer[1024] = "";
@@ -179,7 +179,7 @@ public:
 			index += len;
 			len = index;
 			m_packet = CPacket((BYTE*)buffer, len);
-			if ((len <= 0) && (index <= 0)) {
+			if (len > 0) {//”–Œ Ã‚
 				memmove(buffer, buffer + len, index - len);
 				index -= len;
 				return m_packet.sCmd;
