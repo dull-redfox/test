@@ -211,7 +211,7 @@ public:
 		}
 		return false;
 	}
-	CPacket GetPacket() {
+	CPacket& GetPacket() {
 		return m_packet;
 	}
 	void CloseSocket() {

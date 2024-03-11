@@ -218,7 +218,7 @@ void CRemoteClientDlg::OnBnClickedBtnFileinfo()
 	for (size_t i = 0; i < drivers.size(); i++)
 	{
 		if (drivers[i] == ',') {
-			dr += ";";
+			dr += ":";
 			HTREEITEM hTemp = m_Tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
 			m_Tree.InsertItem(NULL, hTemp, TVI_LAST);
 			dr.clear();
@@ -236,13 +236,13 @@ void CRemoteClientDlg::threadEntryForWatchData(void* arg)
 }
 
 void CRemoteClientDlg::threadWatchData()
-{
+{//可能存在异步问题导致程序崩溃
 	Sleep(50);
 	CClientSocket* pClient = NULL;
 	do {
 		pClient = CClientSocket::getInstance();
 	} while (pClient == NULL);
-	for (;;) {//等价于while(true)
+	while(m_isClosed) {//等价于while(true)
 		if (m_isFull == false) {//更新数据到缓存
 			int ret = SendMessage(WM_SEND_PACKET, 6 << 1 | 1);
 			if (ret == 6) {
@@ -261,6 +261,7 @@ void CRemoteClientDlg::threadWatchData()
 					pStream->Write(pData, pClient->GetPacket().strData.size(), &length);
 					LARGE_INTEGER bg = { 0 };
 					pStream->Seek(bg, STREAM_SEEK_SET, NULL);
+					if ((HBITMAP)m_image != NULL)m_image.Destroy();
 					m_image.Load(pStream);
 					m_isFull = true;
 				}
@@ -369,8 +370,10 @@ void CRemoteClientDlg::LoadFileInfo()
 	m_List.DeleteAllItems();
 	CString strPath = GetPath(hTreeSelected);
 	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
-	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	CClientSocket* pClient = CClientSocket::getInstance();
+	 
+	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();  //先吃个饭，晚点帮你看看
+	
 	int Count = 0;
 	while (pInfo->HasNext) {
 		TRACE("%s isdir %d\r\n", pInfo->szFileName, pInfo->IsDirectory);
@@ -508,7 +511,9 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM IParam)
 		ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)IParam, sizeof(MOUSEEV));
 	}
 		  break;
-	case 6:{
+	case 6:
+	case 7:
+	case 8:{
 		ret = SendCommandPacket(wParam >> 1, wParam & 1);
 	}
 	break;
@@ -522,9 +527,12 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM IParam)
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
+	m_isClosed = false;
 	CWatchDialog dlg(this);
-	_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
+	HANDLE hThread=(HANDLE)_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);
 	dlg.DoModal();
+	m_isClosed = true;
+	WaitForSingleObject(hThread, 500);
 }
 
 

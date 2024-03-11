@@ -243,7 +243,7 @@ int SendScreen()
 	int nWidth = GetDeviceCaps(hScreen, HORZRES);
 	int nHeight = GetDeviceCaps(hScreen, VERTRES);
 	screen.Create(nWidth, nHeight, nBitPerPixel);
-	BitBlt(screen.GetDC(), 0, 0, 1920, 1020, hScreen, 0, 0, SRCCOPY);//将图像复制到screen中
+	BitBlt(screen.GetDC(), 0, 0, nWidth, nHeight, hScreen, 0, 0, SRCCOPY);//将图像复制到screen中
 	ReleaseDC(NULL, hScreen);
 	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);//可变化内存的句柄
 	if (hMem == NULL)return -1;
@@ -284,11 +284,21 @@ unsigned __stdcall threadLockDlg(void* arg)
 	rect.right *= LONG(rect.right*0.2);
 	rect.bottom *= LONG(rect.bottom*0.2);
 	dlg.MoveWindow(rect);
+	CWnd* pText = dlg.GetDlgItem(IDC_STATIC);
+	if (pText) {
+		CRect rtText;
+		pText->GetWindowRect(rtText);
+		int nWidth = rtText.Width() / 2;
+		int x=(rect.right - nWidth) / 2;
+		int nHeight = rtText.Height();
+		int y = (rect.bottom - nHeight) / 2;
+		pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
+	}
 	dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);//窗口置顶
 	//限制鼠标活动范围和功能
 	ShowCursor(false);
-	//::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);//隐藏任务栏
-	//dlg.GetWindowRect(rect);
+	::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);//隐藏任务栏
+	dlg.GetWindowRect(rect);
 	//限制鼠标活动范围
 	rect.left = 0;
 	rect.top = 0;
@@ -306,8 +316,11 @@ unsigned __stdcall threadLockDlg(void* arg)
 			}
 		}
 	}
+	ClipCursor(NULL);
+	//恢复鼠标
 	ShowCursor(true);
-	//::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);//恢复任务栏
+	//恢复任务栏
+	::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);//恢复任务栏
 	dlg.DestroyWindow();
 	_endthreadex(0);
 	return 0;
