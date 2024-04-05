@@ -4,6 +4,8 @@
 #include<string>
 #include<iostream>
 #include<vector>
+#include<list>
+#include<map>
 
 #pragma pack(push)
 #pragma pack(1)
@@ -11,7 +13,7 @@ class CPacket
 {
 public:
 	CPacket() :sHead(0), nLength(0), sCmd(0), sSum(0) {}
-	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize,HANDLE hEvent) {
 		sHead = 0xFEFF;
 		nLength = nSize + 4;
 		sCmd = nCmd;
@@ -28,6 +30,7 @@ public:
 		{
 			sSum += BYTE(strData[j]) & 0xFF;
 		}
+		this->hEvent = hEvent;
 	}
 	CPacket(const CPacket& pack) {
 		sHead = pack.sHead;
@@ -35,8 +38,9 @@ public:
 		sCmd = pack.sCmd;
 		strData = pack.strData;
 		sSum = pack.sSum;
+		hEvent = pack.hEvent;
 	}
-	CPacket(const BYTE* pData, size_t& nSize) {
+	CPacket(const BYTE* pData, size_t& nSize):hEvent(INVALID_HANDLE_VALUE) {
 		size_t i = 0;
 		for (; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {
@@ -81,6 +85,7 @@ public:
 			sCmd = pack.sCmd;
 			strData = pack.strData;
 			sSum = pack.sSum;
+			hEvent = pack.hEvent;
 		}
 		return *this;
 	}
@@ -104,6 +109,7 @@ public:
 	std::string strData;//包数据
 	WORD sSum;//和校验
 	//std::string strOut;//整个包的数据
+	HANDLE hEvent;
 };
 #pragma pack(pop)
 
@@ -226,6 +232,8 @@ public:
 		m_nPort = nPort;
 	}
 private:
+	std::list<CPacket>m_lstSend;
+	std::map<HANDLE, std::list<CPacket>>m_mapAck;
 	int m_nIP;//地址
 	int m_nPort;//端口
 	std::vector<char> m_buffer;
@@ -250,9 +258,12 @@ private:
 	}
 
 	~CClientSocket() {
+		closesocket(m_sock);
+		m_sock = INVALID_SOCKET;
 		WSACleanup();
 	}
-
+	static void threadEntry(void* arg);
+	void threadFunc();
 	BOOL InitSockEnv() {
 		WSADATA data;
 		if (WSAStartup(MAKEWORD(1, 1), &data) != 0) {
