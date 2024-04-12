@@ -167,6 +167,7 @@ public:
 		if (ret == -1) {
 			AfxMessageBox("连接失败");
 			TRACE("连接失败,%d %s\r\n", WSAGetLastError(), GetErrorInfo(WSAGetLastError()).c_str());
+			return false;
 		}
 		return true;
 	}
