@@ -52,20 +52,10 @@ LRESULT CClientController::SendMessage(MSG msg)
 	return info.result;
 }
 
-int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t nLength, std::list<CPacket>* plstPacks)
+bool CClientController::SendCommandPacket(HWND hWnd, int nCmd, bool bAutoClose, BYTE* pData, size_t nLength)
 {
 	CClientSocket* pClient = CClientSocket::getInstance();
-	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	//TODO：不应该直接发送，而是投入队列
-	std::list<CPacket> lstPacks;//应答结果包
-	if (plstPacks ==  NULL)
-		plstPacks = &lstPacks;
-	pClient->SendPacket(CPacket(nCmd, pData, nLength,hEvent),*plstPacks,bAutoClose);
-	CloseHandle(hEvent);//回收事件句柄，防止资源耗尽
-	if (plstPacks->size() > 0) {
-		return plstPacks->front().sCmd;
-	}
-	return -1;
+	return pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength),bAutoClose);
 }
 
 int GetImage(CImage & image) {
@@ -112,7 +102,9 @@ void CClientController::threadWatchScreen()
 	while (!m_isClosed) {
 		if (m_watchDlg.isFull() == false) {
 			std::list<CPacket> lstPacks;
-			int ret=SendCommandPacket(6,true,NULL,0,&lstPacks);
+			int ret=SendCommandPacket(m_watchDlg.GetSafeHwnd(),6,true,NULL,0);
+			//TODO
+			//TODO
 			if (ret == 6) {
 				if (CEdouyunTool::Bytes2Image(m_watchDlg.GetImage(), lstPacks.front().strData) == 0) {
 					m_watchDlg.SetImageStatus(true);
@@ -144,7 +136,7 @@ void CClientController::threadDownloadFile()
 	}
 	CClientSocket* pClient = CClientSocket::getInstance();
 	do {
-		int ret = SendCommandPacket(4, false, (BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength());
+		int ret = SendCommandPacket(m_remoteDlg,4, false, (BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength());
 		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
 		if (nLength == 0) {
 			AfxMessageBox("文件长度为零或者无法读取文件！！！");

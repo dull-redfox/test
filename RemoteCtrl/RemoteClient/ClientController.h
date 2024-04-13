@@ -43,12 +43,13 @@ public:
 //7 锁机
 //8 解锁 
 //1981 测试连接
-//返回值，是命令号，如果小于0则错误
-	int SendCommandPacket(int nCmd,
+//返回值，是状态，true成功，false失败
+	bool SendCommandPacket(
+		HWND hWnd,//数据包收到后，需要应答的窗口
+		int nCmd,
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
-		size_t nLength = 0,
-		std::list<CPacket>* lstPacks = NULL);
+		size_t nLength = 0);
 
 	int DownFile(CString strPath);
 
