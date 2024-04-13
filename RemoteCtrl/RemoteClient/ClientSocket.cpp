@@ -59,13 +59,13 @@ bool CClientSocket::InitSocket()
 
 bool CClientSocket::SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed)
 {
-	if (m_sock == INVALID_SOCKET&&m_hThread==INVALID_HANDLE_VALUE) {
+	if (m_sock == INVALID_SOCKET && m_hThread == INVALID_HANDLE_VALUE) {
 		//if (InitSocket() == false)return false;
-		m_hThread=(HANDLE)_beginthread(&CClientSocket::threadEntry, 0, this);
+		m_hThread = (HANDLE)_beginthread(&CClientSocket::threadEntry, 0, this);
 	}
 	m_lock.lock();
 	auto pr = m_mapAck.insert(std::pair<HANDLE, std::list<CPacket>>(pack.hEvent, lstPacks));
-	m_mapAutoClosed.insert(std::pair<HANDLE, bool>(pack.hEvent,isAutoClosed));
+	m_mapAutoClosed.insert(std::pair<HANDLE, bool>(pack.hEvent, isAutoClosed));
 	m_lstSend.push_back(pack);
 	m_lock.unlock();
 	WaitForSingleObject(pack.hEvent, INFINITE);
@@ -84,6 +84,18 @@ void CClientSocket::threadEntry(void* arg)
 {
 	CClientSocket* thiz = (CClientSocket*)arg;
 	thiz->threadFunc();
+}
+
+void CClientSocket::threadFunc2()
+{
+	MSG msg;
+	while (::GetMessage(&msg, NULL, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		if (m_mapFunc.find(msg.message) != m_mapFunc.end()) {
+			(this->*m_mapFunc[msg.message])(msg.message, msg.wParam, msg.lParam);
+		}
+	}
 }
 
 void CClientSocket::threadFunc()
@@ -129,13 +141,20 @@ void CClientSocket::threadFunc()
 					else if (length <= 0 && index <= 0) {
 						CloseSocket();
 						SetEvent(head.hEvent);
-						m_mapAutoClosed.erase(it0);
+						if (it0 != m_mapAutoClosed.end()) {
+							TRACE("SetEvent %d %d\r\n", head.sCmd, it0->second);
+						}
+						else {
+							TRACE("异常的情况，没有对应的pair\r\n");
+						}
+
 						break;
 					}
 				} while (it0->second == false);
 			}
 			m_lock.lock();
 			m_lstSend.pop_front();
+			m_mapAutoClosed.erase(head.hEvent);
 			m_lock.unlock();
 			if (InitSocket() == false) {
 				InitSocket();
@@ -154,4 +173,21 @@ bool CClientSocket::Send(const CPacket& pack)
 	pack.Data(strOut);
 
 	return send(m_sock, strOut.c_str(), strOut.size(), 0) > 0;
+}
+
+void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
+{
+	if (InitSocket() == true) {
+		int ret = send(m_sock, (char*)wParam, (int)lParam, 0);
+		if (ret > 0) {
+
+		}
+		else {
+			CloseSocket();
+		}
+	}
+	else {
+		
+	}
+
 }
