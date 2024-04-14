@@ -52,15 +52,22 @@ LRESULT CClientController::SendMessage(MSG msg)
 	return info.result;
 }
 
-bool CClientController::SendCommandPacket(HWND hWnd, int nCmd, bool bAutoClose, BYTE* pData, size_t nLength)
+bool CClientController::SendCommandPacket(HWND hWnd, int nCmd, bool bAutoClose, BYTE* pData, size_t nLength,WPARAM wParam)
 {
 	CClientSocket* pClient = CClientSocket::getInstance();
-	return pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength),bAutoClose);
+	return pClient->SendPacket(hWnd,CPacket(nCmd, pData, nLength),bAutoClose,wParam);
 }
 
 int GetImage(CImage & image) {
 	CClientSocket* pClient = CClientSocket::getInstance();
 	return CEdouyunTool::Bytes2Image(image, pClient->GetPacket().strData);
+}
+
+void CClientController::DownloadEnd()
+{
+	m_statusDlg.ShowWindow(SW_HIDE);
+	m_remoteDlg.EndWaitCursor();
+	m_remoteDlg.MessageBox(_T("下载完成！！"), _T("完成!"));
 }
 
 int CClientController::DownFile(CString strPath)
@@ -72,10 +79,16 @@ int CClientController::DownFile(CString strPath)
 		m_strRemote = strPath;
 		m_strLocal = dlg.GetPathName();
 		CString strLocal = dlg.GetPathName();
-		m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
-		if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
-			return -1;
+		FILE* pFile = fopen(m_strLocal, "wb+");
+		if (pFile = NULL) {
+			AfxMessageBox(_T("本地没有权限报错该文件,或者文件无法创建！！！"));
+			return;
 		}
+		SendCommandPacket(m_remoteDlg, 4, false, (BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength(), (WPARAM)pFile);
+		//m_hThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
+		//if (WaitForSingleObject(m_hThreadDownload, 0) != WAIT_TIMEOUT) {
+		//	return -1;
+		//}
 		m_remoteDlg.BeginWaitCursor();
 		m_statusDlg.m_info.SetWindowText(_T("命令正在执行中！"));
 		m_statusDlg.ShowWindow(SW_SHOW);
@@ -136,7 +149,7 @@ void CClientController::threadDownloadFile()
 	}
 	CClientSocket* pClient = CClientSocket::getInstance();
 	do {
-		int ret = SendCommandPacket(m_remoteDlg,4, false, (BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength());
+		int ret = SendCommandPacket(m_remoteDlg,4, false, (BYTE*)(LPCSTR)m_strRemote, m_strRemote.GetLength(),(WPARAM)pFile);
 		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
 		if (nLength == 0) {
 			AfxMessageBox("文件长度为零或者无法读取文件！！！");
