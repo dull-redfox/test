@@ -44,7 +44,7 @@ BEGIN_MESSAGE_MAP(CWatchDialog, CDialog)
 	ON_STN_CLICKED(IDC_WATCH, &CWatchDialog::OnStnClickedWatch)
 	ON_BN_CLICKED(IDC_BTN_LOCK, &CWatchDialog::OnBnClickedBtnLock)
 	ON_BN_CLICKED(IDC_BTN_UNLOCK, &CWatchDialog::OnBnClickedBtnUnlock)
-	ON_MESSAGE(WM_SEND_PACK_ACK,&CWatchDialog::OnSendPackAck)
+	ON_MESSAGE(WM_SEND_PACK_ACK, &CWatchDialog::OnSendPackAck)
 END_MESSAGE_MAP()
 
 
@@ -96,33 +96,34 @@ void CWatchDialog::OnTimer(UINT_PTR nIDEvent)
 
 LRESULT CWatchDialog::OnSendPackAck(WPARAM wParam, LPARAM lParam)
 {
-	if (lParam ==-1||(lParam==-2)) {
+	if (lParam == -1 || (lParam == -2)) {
 		//错误处理
 	}
 	else if (lParam == 1) {
 		//对方关闭套接字
 	}
-	else if(lParam == 0||(lParam>0)) {
+	else if (lParam == 0 || (lParam > 0)) {
 		CPacket* pPacket = (CPacket*)wParam;
 		if (pPacket != NULL) {
-			switch (pPacket->sCmd) {
+			CPacket head = *(CPacket*)wParam;
+			delete (CPacket*)wParam;
+			switch (head.sCmd) {
 			case 6:
 			{
-				if (m_isFull) {
-					CEdouyunTool::Bytes2Image(m_image, pPacket->strData);
-					CRect rect;
-					m_picture.GetWindowRect(rect);
-					m_nObjWidth = m_image.GetWidth();
-					m_nObjHeight = m_image.GetHeight();
-					m_image.StretchBlt(
-						m_picture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
-					m_picture.InvalidateRect(NULL);
-					m_image.Destroy();
-					m_isFull = false;
-				}
-			}
+				CEdouyunTool::Bytes2Image(m_image, head.strData);
+				CRect rect;
+				m_picture.GetWindowRect(rect);
+				m_nObjWidth = m_image.GetWidth();
+				m_nObjHeight = m_image.GetHeight();
+				m_image.StretchBlt(
+					m_picture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
+				m_picture.InvalidateRect(NULL);
+				m_image.Destroy();
 				break;
+			}
 			case 5:
+				TRACE("远程端应答了鼠标操作\r\n");
+				break;
 			case 7:
 			case 8:
 			default:
@@ -143,7 +144,7 @@ void CWatchDialog::OnLButtonDblClk(UINT nFlags, CPoint point)
 		event.ptXY = remote;
 		event.nButton = 0;//左键
 		event.nAction = 2;//双击
-		CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(),5, true, (BYTE*)&event, sizeof(event));
+		CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 5, true, (BYTE*)&event, sizeof(event));
 	}
 	CDialog::OnLButtonDblClk(nFlags, point);
 }

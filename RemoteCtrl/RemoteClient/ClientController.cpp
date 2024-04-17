@@ -113,19 +113,21 @@ void CClientController::StartWatchScreen()
 void CClientController::threadWatchScreen()
 {
 	Sleep(50);
+	ULONGLONG nTick = GetTickCount64();
 	while (!m_isClosed) {
 		if (m_watchDlg.isFull() == false) {
-			std::list<CPacket> lstPacks;
+			if (GetTickCount64() - nTick < 200) {
+				Sleep(50-DWORD(GetTickCount64()-nTick));
+			}
+			nTick = GetTickCount64();
 			int ret=SendCommandPacket(m_watchDlg.GetSafeHwnd(),6,true,NULL,0);
 			//TODO
 			//TODO
-			if (ret == 6) {
-				if (CEdouyunTool::Bytes2Image(m_watchDlg.GetImage(), lstPacks.front().strData) == 0) {
-					m_watchDlg.SetImageStatus(true);
-				}
-				else {
-					TRACE("»ñÈ¡Í¼Æ¬Ê§°Ü£¡ret=%d\r\n", ret);
-				}
+			if (ret == 1) {
+				TRACE("³É¹¦ÉèÖÃÇëÇóÍ¼Æ¬ÃüÁî\r\n");
+			}
+			else {
+				TRACE("»ñÈ¡Í¼Æ¬Ê§°Ü£¡ret=%d\r\n",ret);
 			}
 		}
 		Sleep(1);
