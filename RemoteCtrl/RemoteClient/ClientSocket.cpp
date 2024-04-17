@@ -53,6 +53,10 @@ CClientSocket::CClientSocket() :m_nIP(INADDR_ANY), m_nPort(0), m_sock(INVALID_SO
 		MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置！"), _T("初始化错误！"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
+	m_eventInvoke = CreateEvent(NULL, TRUE, FALSE, "");
+	if(WaitForSingleObject(m_eventInvoke, 100) == WAIT_TIMEOUT){
+		TRACE("网络消息处理线程启动失败！\r\n");
+	}
 	m_buffer.resize(BUFFER_SIZE);
 	memset(m_buffer.data(), 0, BUFFER_SIZE);
 	struct {
@@ -100,7 +104,8 @@ bool CClientSocket::SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed
 	UINT nMode = isAutoClosed?CSM_AUTOCLOSE:0;
 	std::string strOut;
 	pack.Data(strOut);
-	return PostThreadMessage(m_nThreadID, WM_SEND_PACK, (WPARAM)new PACKET_DATA(strOut.c_str(),strOut.size(),nMode,wParam),(LPARAM)hWnd);
+	bool ret = PostThreadMessage(m_nThreadID, WM_SEND_PACK, (WPARAM)new PACKET_DATA(strOut.c_str(),strOut.size(),nMode,wParam),(LPARAM)hWnd);
+	return ret;
 }
 
 /*
@@ -135,17 +140,6 @@ unsigned CClientSocket::threadEntry(void* arg)
 	return 0;
 }
 
-void CClientSocket::threadFunc2()
-{
-	MSG msg;
-	while (::GetMessage(&msg, NULL, 0, 0)) {
-		TranslateMessage(&msg);
-		DispatchMessage(&msg);
-		if (m_mapFunc.find(msg.message) != m_mapFunc.end()) {
-			(this->*m_mapFunc[msg.message])(msg.message, msg.wParam, msg.lParam);
-		}
-	}
-}
 /*
 void CClientSocket::threadFunc()
 {
@@ -214,6 +208,20 @@ void CClientSocket::threadFunc()
 	CloseSocket();
 }
 */
+
+void CClientSocket::threadFunc2()
+{
+	SetEvent(m_eventInvoke);
+	MSG msg;
+	while (::GetMessage(&msg, NULL, 0, 0)) {
+		TranslateMessage(&msg);
+		DispatchMessage(&msg);
+		if (m_mapFunc.find(msg.message) != m_mapFunc.end()) {
+			(this->*m_mapFunc[msg.message])(msg.message, msg.wParam, msg.lParam);
+		}
+	}
+}
+
 bool CClientSocket::Send(const CPacket& pack)
 {
 	TRACE("m_sock=%d\r\n", m_sock);
