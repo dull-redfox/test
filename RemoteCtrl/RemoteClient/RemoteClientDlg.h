@@ -29,11 +29,16 @@ private:
 	bool m_isClosed;//监视是否关闭
 private:
 	//void threadDownFile();
+	void InitUIData();
 	void LoadFileCurrent();
+	void Str2Tree(const std::string& driver, CTreeCtrl& tree);
+	void UpdataFileInfo(FILEINFO& finfo, HTREEITEM hParent);
+	void UpdateDownloadFile(const std::string& strData,FILE* pFile);
 	CString GetPath(HTREEITEM hTree);
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 // 实现
 protected:
+	void DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam);
 	HICON m_hIcon;
 	CStatusDlg m_dlgStatus;
 	// 生成的消息映射函数
