@@ -239,8 +239,11 @@ void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
 	if (InitSocket() == true) {
 		PACKET_DATA data = *(PACKET_DATA*)wParam;
 		delete (PACKET_DATA*)wParam;
+		HWND hWnd = (HWND)lParam;
+		size_t nTemp = data.strData.size();
+		CPacket current((BYTE*)data.strData.c_str(),nTemp);
 		if (InitSocket() == true) {
-			int ret = send(m_sock, (char*)wParam, (int)lParam, 0);
+			int ret = send(m_sock, (char*)data.strData.c_str(), (int)data.strData.size(), 0);
 			if (ret > 0) {
 				size_t index = 0;
 				std::string strBuffer;
@@ -251,7 +254,7 @@ void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
 					if (length > 0 || index > 0) {
 						index += (size_t)length;
 						size_t nLen = index;
-						CPacket pack((BYTE*)pBuffer, index);
+						CPacket pack((BYTE*)pBuffer, nLen);
 						if (nLen > 0) {
 							::SendMessage(hWnd, WM_SEND_PACK_ACK, (WPARAM)new CPacket(pack), data.wParam);
 							if (data.nMode & CSM_AUTOCLOSE) {
@@ -260,11 +263,11 @@ void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
 							}
 						}
 						index -= nLen;
-						memmove(pBuffer, pBuffer + index, nLen);
+						memmove(pBuffer, pBuffer + nLen, index);
 					}
 					else {
 						CloseSocket();
-						::SendMessage(hWnd, WM_SEND_PACK_ACK, NULL, 1);
+						::SendMessage(hWnd, WM_SEND_PACK_ACK, (WPARAM)new CPacket(current.sCmd,NULL,0), 1);
 					}
 				}
 
