@@ -49,6 +49,14 @@ void WriteRegisterTable(const CString& strPath)
 
 }
 
+//该bug思路：
+//0 观察现象
+//1 确定范围
+//2 分析错误的可能性
+//3 调试或者打日志，排查错误
+//4 处理错误
+//5 验证/长时间验证/多次验证/多条件的验证
+
 //放入启动文件夹
 void WriteStartupDir(const CString& strPath)
 {
@@ -92,10 +100,77 @@ void ChooseAutoInvoke() {
 	return;
 }
 
+void ShowError() {
+	LPWSTR lpMessageBuf = NULL;
+	FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+		NULL, GetLastError(),
+		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+		(LPWSTR)&lpMessageBuf, 0, NULL);
+	OutputDebugString(lpMessageBuf);
+	MessageBox(NULL, lpMessageBuf, _T("发生错误"), 0);
+	LocalFree(lpMessageBuf);
+}
+
+bool IsAdmin() {
+	HANDLE hToken = NULL;
+	if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+		ShowError();
+		return false;
+	}
+	TOKEN_ELEVATION eve;
+	DWORD len = 0;
+	if (GetTokenInformation(hToken, TokenElevation, &eve, sizeof(eve), &len) == FALSE) {
+		ShowError();
+		return false;
+	}
+	CloseHandle(hToken);
+	if (len == sizeof(eve)) {
+		return eve.TokenIsElevated;
+	}
+	printf("length of tokeninformation is %d\r\n", len);
+	return false;
+}
+
+void RunAsAdmin() {
+	HANDLE hToken = NULL;
+	BOOL ret = LogonUser(L"Administrator", NULL, NULL, LOGON32_LOGON_BATCH, LOGON32_PROVIDER_DEFAULT, &hToken);
+	if (!ret) {
+		ShowError();
+		MessageBox(NULL, _T("登录错误！"), _T("程序错误"), 0);
+		::exit(0);
+	}
+	OutputDebugString(L"Logon administrator success!\r\n");
+	STARTUPINFO si = { 0 };
+	PROCESS_INFORMATION pi = { 0 };
+	TCHAR sPath[MAX_PATH] = _T("");
+	GetCurrentDirectory(MAX_PATH, sPath);
+	CString strCmd = sPath;
+	strCmd += _T("\\RemoteCtrl.exe");
+	ret = CreateProcessWithLogonW(_T("Administrator"), NULL, NULL, LOGON_WITH_PROFILE, NULL, (LPWSTR)(LPCWSTR)strCmd, CREATE_UNICODE_ENVIRONMENT, NULL, NULL, &si, &pi);
+	CloseHandle(hToken);
+	if (!ret) {
+		ShowError();
+		MessageBox(NULL, strCmd, _T("创建进程失败"), 0);
+		::exit(0);
+	}
+	WaitForSingleObject(pi.hProcess, INFINITE);
+	CloseHandle(pi.hProcess);
+	CloseHandle(pi.hThread);
+}
+
+
 int main()
 {
 	int nRetCode = 0;
-
+	HMODULE hModule = ::GetModuleHandle(nullptr);
+	if (IsAdmin()) {
+		OutputDebugString(L"current is run as administrator!\r\n");
+	}
+	else {
+		printf("current is run as normal user!\r\n");
+		return nRetCode;
+	}
+	
 	HMODULE hModule = ::GetModuleHandle(nullptr);
 
 	if (hModule != nullptr)
@@ -109,6 +184,14 @@ int main()
 		}
 		else
 		{
+			if (IsAdmin()) {
+				OutputDebugString(L"current is run as administrator!\r\n");
+			}
+			else {
+				OutputDebugString(L"current is run as normal user!\r\n");
+				RunAsAdmin();
+				return nRetCode;
+			}
 			// TODO: 在此处为应用程序的行为编写代码。
 			CCommand cmd;
 			//ChooseAutoInvoke();
